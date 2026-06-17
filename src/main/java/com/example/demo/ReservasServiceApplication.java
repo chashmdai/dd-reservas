@@ -35,7 +35,19 @@ public class ReservasServiceApplication {
 
 }
 
-record Domo(Long id, String nombre, Integer capacidad, BigDecimal precioPorNoche, String estado) {
+record Domo(
+		Long id,
+		String nombre,
+		Integer capacidad,
+		BigDecimal precioPorNoche,
+		String estado,
+		Double superficie,
+		String equipacion,
+		String ubicacion,
+		String tipo) {
+}
+
+record DomoDetalle(Long id, String nombre, Double superficie, String equipacion, String ubicacion, String tipo) {
 }
 
 record Reserva(
@@ -72,9 +84,66 @@ class ReservasStore {
 
 	@PostConstruct
 	void cargarDatosIniciales() {
-		createDomo(new Domo(null, "Domo Luna", 2, new BigDecimal("85000"), "DISPONIBLE"));
-		createDomo(new Domo(null, "Domo Salar", 4, new BigDecimal("120000"), "DISPONIBLE"));
-		createDomo(new Domo(null, "Domo Cielo", 3, new BigDecimal("100000"), "DISPONIBLE"));
+		// --- Domos ---
+		Domo domoLuna = createDomo(new Domo(null, "Domo Luna", 2, new BigDecimal("85000"), "DISPONIBLE",
+				38.5, "Cama doble, calefaccion, bano privado, telescopio, jacuzzi exterior", "Sector Valle del Rio, km 3", "GEODESICO"));
+		Domo domoSalar = createDomo(new Domo(null, "Domo Salar", 4, new BigDecimal("120000"), "DISPONIBLE",
+				52.0, "2 camas matrimoniales, kitchenette, bano privado, terraza panoramica, bicicletas", "Borde Salar de Atacama, km 7", "CUPULA"));
+		Domo domoCielo = createDomo(new Domo(null, "Domo Cielo", 3, new BigDecimal("100000"), "DISPONIBLE",
+				45.0, "Cama matrimonial, sofa cama, bano privado, piso calefaccionado, hamaca", "Cerro Quitor, altura 2450m", "GEODESICO"));
+		Domo domoVolcan = createDomo(new Domo(null, "Domo Volcan", 2, new BigDecimal("95000"), "DISPONIBLE",
+				36.0, "Cama doble, bano privado, estufa a lena, deck privado con vista al Licancabur", "Ruta 23 km 45, faldas del Licancabur", "GEODESICO"));
+		Domo domoOasis = createDomo(new Domo(null, "Domo Oasis", 5, new BigDecimal("140000"), "MANTENIMIENTO",
+				68.0, "3 camas, sala de estar, cocina equipada, 2 banos, piscina privada, BBQ", "Oasis de Chiu-Chiu, sector norte", "CUPULA_GRANDE"));
+
+		// --- Reservas pre-cargadas (minimo 10, fechas distintas, estados variados) ---
+
+		// Domo Luna (id=1)
+		insertarReserva(domoLuna.id(), "Sofia Morales", "sofia@mail.cl", "+56912345678",
+				"2026-01-10", "2026-01-13", 2, "CONFIRMADA");
+		insertarReserva(domoLuna.id(), "Carlos Pena", "carlos@mail.cl", "+56987654321",
+				"2026-02-05", "2026-02-08", 1, "CANCELADA");
+		insertarReserva(domoLuna.id(), "Maria Fuentes", "maria@mail.cl", "+56911112222",
+				"2026-07-15", "2026-07-18", 2, "PENDIENTE_PAGO");
+		insertarReserva(domoLuna.id(), "Jorge Diaz", "jorge@mail.cl", "+56933334444",
+				"2026-03-20", "2026-03-23", 2, "CONFIRMADA");
+
+		// Domo Salar (id=2)
+		insertarReserva(domoSalar.id(), "Ana Ramirez", "ana@mail.cl", "+56955556666",
+				"2026-01-20", "2026-01-24", 4, "CONFIRMADA");
+		insertarReserva(domoSalar.id(), "Pablo Torres", "pablo@mail.cl", "+56977778888",
+				"2026-02-14", "2026-02-17", 2, "CANCELADA");
+		insertarReserva(domoSalar.id(), "Valentina Rios", "vale@mail.cl", "+56999990000",
+				"2026-08-10", "2026-08-14", 3, "PENDIENTE_PAGO");
+
+		// Domo Cielo (id=3)
+		insertarReserva(domoCielo.id(), "Luis Herrera", "luis@mail.cl", "+56922223333",
+				"2026-01-05", "2026-01-07", 2, "CONFIRMADA");
+		insertarReserva(domoCielo.id(), "Camila Vega", "camila@mail.cl", "+56944445555",
+				"2026-04-22", "2026-04-25", 3, "CANCELADA");
+		insertarReserva(domoCielo.id(), "Roberto Soto", "roberto@mail.cl", "+56966667777",
+				"2026-09-01", "2026-09-04", 2, "PENDIENTE_PAGO");
+		insertarReserva(domoCielo.id(), "Daniela Munoz", "daniela@mail.cl", "+56988889999",
+				"2026-05-10", "2026-05-13", 3, "CONFIRMADA");
+
+		// Domo Volcan (id=4)
+		insertarReserva(domoVolcan.id(), "Tomas Araya", "tomas@mail.cl", "+56911223344",
+				"2026-06-05", "2026-06-08", 2, "CONFIRMADA");
+	}
+
+	private void insertarReserva(Long domoId, String clienteNombre, String email, String tel,
+								 String checkIn, String checkOut, int pasajeros, String estado) {
+		Domo domo = domos.get(domoId);
+		if (domo == null) return;
+		LocalDate ci = LocalDate.parse(checkIn);
+		LocalDate co = LocalDate.parse(checkOut);
+		long nights = ChronoUnit.DAYS.between(ci, co);
+		BigDecimal total = domo.precioPorNoche().multiply(BigDecimal.valueOf(nights));
+		BigDecimal deposito = total.multiply(new BigDecimal("0.50"));
+		long id = reservaIds.incrementAndGet();
+		Reserva r = new Reserva(id, "RES-" + String.format("%04d", id), domoId,
+				clienteNombre, email, tel, checkIn, checkOut, pasajeros, (int) nights, total, deposito, estado);
+		reservas.put(id, r);
 	}
 
 	List<Domo> findDomos() {
@@ -85,9 +154,16 @@ class ReservasStore {
 		return Optional.ofNullable(domos.get(id));
 	}
 
+	Optional<DomoDetalle> findDomoDetalle(Long id) {
+		Domo d = domos.get(id);
+		if (d == null) return Optional.empty();
+		return Optional.of(new DomoDetalle(d.id(), d.nombre(), d.superficie(), d.equipacion(), d.ubicacion(), d.tipo()));
+	}
+
 	Domo createDomo(Domo input) {
 		Domo saved = new Domo(domoIds.incrementAndGet(), textOr(input.nombre(), "Domo sin nombre"),
-				numberOr(input.capacidad(), 1), moneyOr(input.precioPorNoche()), textOr(input.estado(), "DISPONIBLE"));
+				numberOr(input.capacidad(), 1), moneyOr(input.precioPorNoche()), textOr(input.estado(), "DISPONIBLE"),
+				input.superficie(), input.equipacion(), input.ubicacion(), input.tipo());
 		domos.put(saved.id(), saved);
 		return saved;
 	}
@@ -98,7 +174,8 @@ class ReservasStore {
 		}
 
 		Domo saved = new Domo(id, textOr(input.nombre(), "Domo sin nombre"), numberOr(input.capacidad(), 1),
-				moneyOr(input.precioPorNoche()), textOr(input.estado(), "DISPONIBLE"));
+				moneyOr(input.precioPorNoche()), textOr(input.estado(), "DISPONIBLE"),
+				input.superficie(), input.equipacion(), input.ubicacion(), input.tipo());
 		domos.put(id, saved);
 		return Optional.of(saved);
 	}
@@ -262,6 +339,11 @@ class DomoController {
 	@GetMapping("/{id}")
 	ResponseEntity<Domo> find(@PathVariable Long id) {
 		return ResponseEntity.of(store.findDomo(id));
+	}
+
+	@GetMapping("/{id}/detalle")
+	ResponseEntity<DomoDetalle> detalle(@PathVariable Long id) {
+		return ResponseEntity.of(store.findDomoDetalle(id));
 	}
 
 	@GetMapping("/disponibles")
