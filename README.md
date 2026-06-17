@@ -1,148 +1,63 @@
-# Reservas Service - Atacama Domes
+# Reservas Service — Atacama Domes
 
-Microservicio basico para gestionar domos, reservas de hospedaje y pagos simulados del MVP de Atacama Domes.
-
-Esta version sigue enfoque KISS: no usa base de datos, no usa JPA y guarda datos en memoria mientras la aplicacion esta corriendo.
+Microservicio de gestión de domos, reservas y pagos del lodge boutique Atacama Domes.
 
 ## Stack
-
-- Java 21
-- Spring Boot 3.5.x
-- Spring Web
-- Spring Boot Actuator
-- Maven
-
-## Puerto
-
-```text
-http://localhost:8081
-```
-
-Cuando se consume desde el gateway:
-
-```text
-http://localhost:8080/api/reservas
-```
-
-## Datos iniciales
-
-Al iniciar carga domos de ejemplo:
-
-- Domo Luna
-- Domo Salar
-- Domo Cielo
+- Java 21 · Spring Boot 3.5 · almacenamiento en memoria (`ConcurrentHashMap`)
+- Puerto: **8081**
 
 ## Endpoints
 
 ### Domos
-
-```http
-GET    /domos
-GET    /domos/{id}
-POST   /domos
-PUT    /domos/{id}
-GET    /domos/disponibles?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&pasajeros=2
-```
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/domos` | Listar todos los domos |
+| GET | `/domos/{id}` | Obtener domo por ID |
+| GET | `/domos/{id}/detalle` | Ficha: superficie, equipación, ubicación, tipo |
+| GET | `/domos/disponibles?checkIn=&checkOut=&pasajeros=` | Buscar disponibilidad |
+| POST | `/domos` | Crear domo |
+| PUT | `/domos/{id}` | Actualizar domo |
 
 ### Reservas
-
-```http
-GET    /reservas
-GET    /reservas/{id}
-GET    /reservas/codigo/{codigo}
-POST   /reservas
-POST   /reservas/{id}/cancelar
-```
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/reservas` | Listar reservas |
+| GET | `/reservas/{id}` | Obtener reserva |
+| GET | `/reservas/codigo/{codigo}` | Buscar por código RES-XXXX |
+| POST | `/reservas` | Crear reserva (valida solapamiento y capacidad) |
+| POST | `/reservas/{id}/cancelar` | Cancelar reserva |
 
 ### Pagos
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/reservas/{id}/pagos` | Listar pagos de una reserva |
+| POST | `/reservas/{id}/pagos` | Registrar pago (confirma reserva si cubre depósito) |
 
-```http
-GET    /reservas/{id}/pagos
-POST   /reservas/{id}/pagos
+## Datos semilla
+Al iniciar se cargan automáticamente:
+- **5 domos**: Luna, Salar, Cielo, Volcán (DISPONIBLE) y Oasis (MANTENIMIENTO)
+- **13 reservas** con estados CONFIRMADA, CANCELADA y PENDIENTE_PAGO en fechas distintas
+
+## Pruebas unitarias
+
+```bash
+./mvnw test
 ```
 
-### Health
+23 tests en `ReservasStoreTest` — sin contexto Spring, instancian el store directamente.
 
-```http
-GET    /actuator/health
+## Migración BD (referencia)
+
+`src/main/resources/db/migration/V1__initial.sql` documenta el esquema completo para Flyway/Liquibase si se migra a una BD real.
+
+## Ejecutar en local
+
+```bash
+./mvnw spring-boot:run
 ```
 
-## Ejecutar
+## Docker
 
-Desde esta carpeta:
-
-```powershell
-.\mvnw.cmd spring-boot:run
+```bash
+docker build -t dd-reservas .
 ```
-
-O usando el jar:
-
-```powershell
-.\mvnw.cmd -DskipTests package
-java -jar target\reservas-service-0.0.1-SNAPSHOT.jar
-```
-
-## Pruebas
-
-```powershell
-.\mvnw.cmd test
-```
-
-## Ejemplos con PowerShell
-
-Listar domos:
-
-```powershell
-Invoke-RestMethod http://localhost:8081/domos
-```
-
-Buscar domos disponibles:
-
-```powershell
-Invoke-RestMethod "http://localhost:8081/domos/disponibles?checkIn=2026-07-01&checkOut=2026-07-03&pasajeros=2"
-```
-
-Crear reserva:
-
-```powershell
-$reserva = Invoke-RestMethod `
-  -Method Post `
-  -Uri http://localhost:8081/reservas `
-  -ContentType "application/json" `
-  -Body '{"domoId":1,"clienteNombre":"Cliente Demo","clienteEmail":"demo@test.cl","clienteTelefono":"+56900000000","checkIn":"2026-07-01","checkOut":"2026-07-03","pasajeros":2}'
-
-$reserva
-```
-
-Registrar pago aprobado:
-
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8081/reservas/$($reserva.id)/pagos" `
-  -ContentType "application/json" `
-  -Body '{"monto":85000,"metodo":"TRANSFERENCIA","estado":"APROBADO"}'
-```
-
-Consultar reserva confirmada:
-
-```powershell
-Invoke-RestMethod "http://localhost:8081/reservas/$($reserva.id)"
-```
-
-## Reglas simples implementadas
-
-- Una reserva requiere domo, fechas validas y pasajeros.
-- `checkIn` debe ser anterior a `checkOut`.
-- No se permite reservar un domo ocupado en fechas cruzadas.
-- El total se calcula como noches por precio por noche.
-- El deposito requerido es el 50 por ciento del total.
-- Una reserva inicia como `PENDIENTE_PAGO`.
-- Un pago `APROBADO` que cubre el deposito confirma la reserva.
-- Una reserva `CANCELADA` no bloquea disponibilidad.
-
-## Notas
-
-- Los datos se pierden al apagar el servicio.
-- Este servicio no usa base de datos real todavia.
-- Para la demostracion automatizada, usar el script raiz `crud-microservices-demo.ps1`.
